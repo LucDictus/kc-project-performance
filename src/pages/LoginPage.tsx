@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { supabase } from '../lib/supabase'
+import { api } from '../lib/api'
 
 export default function LoginPage() {
   const navigate = useNavigate()
@@ -13,60 +13,28 @@ export default function LoginPage() {
     const stored = localStorage.getItem('kc_user')
     if (stored) {
       const user = JSON.parse(stored)
-      if (user.role === 'admin') {
-        navigate('/admin', { replace: true })
-      } else {
-        navigate('/shift', { replace: true })
-      }
+      navigate(user.role === 'admin' ? '/admin' : '/shift', { replace: true })
     }
   }, [navigate])
 
   async function handleLogin() {
-  setError(null)
-  setLoading(true)
+    setError(null)
+    setLoading(true)
 
-  const { data, error } = await supabase
-    .from('employees')
-    .select('id, name, role, username')
-    .eq('username', username)
-    .eq('password_hash', password) // ⚠ temporary MVP check
-    .eq('is_active', true)
-    .single()
+    try {
+      const user = await api.post<{ id: number; name: string; role: 'admin' | 'mechanic' }>(
+        '/employees/login.php',
+        { username, password }
+      )
 
-  if (error || !data) {
-    setError('Gebruikersnaam of wachtwoord onjuist.')
-    return
+      localStorage.setItem('kc_user', JSON.stringify(user))
+      navigate(user.role === 'admin' ? '/admin' : '/shift', { replace: true })
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Inloggen mislukt')
+    } finally {
+      setLoading(false)
+    }
   }
-
-  const user = data as {
-    id: string
-    name: string
-    role: 'admin' | 'mechanic'
-    username: string
-  }  
-
-  setLoading(false)
-
-  if (error || !data) {
-    setError('Gebruikersnaam of wachtwoord onjuist.')
-    return
-  }
-
-  localStorage.setItem(
-    'kc_user',
-    JSON.stringify({
-      id: user.id,
-      name: user.name,
-      role: user.role,
-    })
-  )
-
-  if (user.role === 'admin') {
-    navigate('/admin', { replace: true })
-  } else {
-    navigate('/shift', { replace: true })
-  }
-}
 
   return (
     <div style={{
@@ -78,7 +46,6 @@ export default function LoginPage() {
       padding: '2rem',
       background: 'var(--color-bg)',
     }}>
-      {/* Logo / merk */}
       <div style={{ marginBottom: '2.5rem', textAlign: 'center' }}>
         <h1 style={{
           fontFamily: 'var(--font-display)',
@@ -88,14 +55,13 @@ export default function LoginPage() {
           color: 'var(--color-accent)',
           textTransform: 'uppercase',
         }}>
-          KCPerformance
+          KC Performance
         </h1>
         <p style={{ color: 'var(--color-text-muted)', fontSize: '0.875rem', marginTop: '0.25rem' }}>
           Project Registratie
         </p>
       </div>
 
-      {/* Login card */}
       <div style={{
         width: '100%',
         maxWidth: '360px',
@@ -174,7 +140,7 @@ const buttonStyle: React.CSSProperties = {
   width: '100%',
   padding: '0.875rem',
   background: 'var(--color-accent)',
-  color: '#ffffff',           // ← was #000
+  color: '#ffffff',
   fontFamily: 'var(--font-display)',
   fontSize: '1rem',
   fontWeight: 700,

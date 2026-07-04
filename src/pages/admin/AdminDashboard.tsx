@@ -1,23 +1,24 @@
 import { useState } from 'react'
 import PageLayout from '../../components/layout/PageLayout'
+import OverviewTab from './tabs/OverviewTab'
 import ActiveTab from './tabs/ActiveTab'
 import EmployeesTab from './tabs/EmployeesTab'
 import ProjectsTab from './tabs/ProjectsTab'
 
-type Tab = 'active' | 'employees' | 'projects'
+type Tab = 'overview' | 'active' | 'employees' | 'projects'
 
 const tabs: { id: Tab; label: string }[] = [
-  { id: 'active', label: 'Actief' },
-  { id: 'employees', label: 'Medewerkers' },
-  { id: 'projects', label: 'Projecten' },
+  { id: 'overview',   label: 'Overzicht' },
+  { id: 'active',     label: 'Actief' },
+  { id: 'employees',  label: 'Medewerkers' },
+  { id: 'projects',   label: 'Projecten' },
 ]
 
 export default function AdminDashboard() {
-  const [activeTab, setActiveTab] = useState<Tab>('active')
+  const [activeTab, setActiveTab] = useState<Tab>('overview')
 
   return (
     <PageLayout title="Dashboard">
-      {/* Tab bar */}
       <div style={tabBarStyle}>
         {tabs.map(tab => (
           <button
@@ -29,16 +30,15 @@ export default function AdminDashboard() {
             }}
           >
             {tab.label}
-            {activeTab === tab.id && <div style={tabIndicatorStyle} />}
           </button>
         ))}
       </div>
 
-      {/* Tab content */}
       <div style={{ marginTop: '1.5rem' }}>
-        {activeTab === 'active'    && <ActiveTab />}
-        {activeTab === 'employees' && <EmployeesTab />}
-        {activeTab === 'projects'  && <ProjectsTab />}
+        {activeTab === 'overview'   && <OverviewTab />}
+        {activeTab === 'active'     && <ActiveTab />}
+        {activeTab === 'employees'  && <EmployeesTab />}
+        {activeTab === 'projects'   && <ProjectsTab />}
       </div>
     </PageLayout>
   )
@@ -47,12 +47,10 @@ export default function AdminDashboard() {
 const tabBarStyle: React.CSSProperties = {
   display: 'flex',
   borderBottom: '1px solid var(--color-border)',
-  gap: '0',
-  marginBottom: '-1px',
+  overflowX: 'auto',
 }
 
 const tabButtonStyle: React.CSSProperties = {
-  position: 'relative',
   padding: '0.75rem 1.25rem',
   background: 'none',
   border: 'none',
@@ -64,20 +62,11 @@ const tabButtonStyle: React.CSSProperties = {
   letterSpacing: '0.04em',
   textTransform: 'uppercase',
   color: 'var(--color-text-muted)',
-  transition: 'color 0.15s',
   whiteSpace: 'nowrap',
+  transition: 'color 0.15s',
 }
 
 const tabButtonActiveStyle: React.CSSProperties = {
   color: 'var(--color-accent)',
   borderBottom: '2px solid var(--color-accent)',
-}
-
-const tabIndicatorStyle: React.CSSProperties = {
-  position: 'absolute',
-  bottom: '-1px',
-  left: 0,
-  right: 0,
-  height: '2px',
-  background: 'var(--color-accent)',
 }
