@@ -1,19 +1,10 @@
 import { useQuery } from '@tanstack/react-query'
-import { supabase } from '../lib/supabase'
-
-async function fetchProjects() {
-  const { data, error } = await supabase
-    .from('projects')
-    .select('*')
-    .order('created_at', { ascending: false })
-
-  if (error) throw error
-  return data ?? []
-}
+import { api } from '../lib/api'
+import type { Project } from '../types/database'
 
 export function useProjects() {
   return useQuery({
     queryKey: ['projects'],
-    queryFn: fetchProjects,
+    queryFn: () => api.get<Project[]>('/projects/index.php'),
   })
 }

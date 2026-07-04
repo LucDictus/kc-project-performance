@@ -1,19 +1,10 @@
 import { useQuery } from '@tanstack/react-query'
-import { supabase } from '../lib/supabase'
-
-async function fetchEmployees() {
-  const { data, error } = await supabase
-    .from('employees')
-    .select('*')
-    .order('name')
-
-  if (error) throw error
-  return data ?? []
-}
+import { api } from '../lib/api'
+import type { Employee } from '../types/database'
 
 export function useEmployees() {
   return useQuery({
     queryKey: ['employees'],
-    queryFn: fetchEmployees,
+    queryFn: () => api.get<Employee[]>('/employees/index.php'),
   })
 }
