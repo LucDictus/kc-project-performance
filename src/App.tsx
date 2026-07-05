@@ -2,9 +2,9 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import LoginPage from './pages/LoginPage'
 import ShiftPage from './pages/ShiftPage'
 import AdminDashboard from './pages/admin/AdminDashboard'
-import ProtectedRoute from './components/ProtectedRoute'
 import EmployeeDetailPage from './pages/admin/EmployeeDetailPage'
 import ProjectDetailPage from './pages/admin/ProjectDetailPage'
+import ProtectedRoute from './components/auth/ProtectedRoute'
 
 export default function App() {
   return (
@@ -15,7 +15,7 @@ export default function App() {
         <Route
           path="/shift"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute requiredRole="mechanic">
               <ShiftPage />
             </ProtectedRoute>
           }
@@ -24,28 +24,28 @@ export default function App() {
         <Route
           path="/admin"
           element={
-            <ProtectedRoute role="admin">
+            <ProtectedRoute requiredRole="admin">
               <AdminDashboard />
             </ProtectedRoute>
           }
         />
 
-        <Route 
-          path="/admin/employees/:id"     
+        <Route
+          path="/admin/employees/:id"
           element={
-            <ProtectedRoute role="admin">
+            <ProtectedRoute requiredRole="admin">
               <EmployeeDetailPage />
             </ProtectedRoute>
-          } 
+          }
         />
 
-        <Route 
-          path="/admin/projects/:id"       
+        <Route
+          path="/admin/projects/:id"
           element={
-            <ProtectedRoute role="admin">
+            <ProtectedRoute requiredRole="admin">
               <ProjectDetailPage />
             </ProtectedRoute>
-          } 
+          }
         />
 
         <Route path="*" element={<Navigate to="/login" replace />} />
