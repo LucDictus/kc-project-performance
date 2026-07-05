@@ -1,10 +1,12 @@
 import { useState } from 'react'
 import type { Project, ProjectStatus } from '../../../types/database'
 import { useProjects } from '../../../hooks/useProjects'
+import { useNavigate } from 'react-router-dom'
 
 type StatusFilter = 'all' | ProjectStatus
 
 export default function ProjectsTab() {
+  const navigate = useNavigate()
   const { data: projects = [], isLoading, error } = useProjects()
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
@@ -45,7 +47,10 @@ export default function ProjectsTab() {
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.625rem' }}>
           {filtered.map((p: Project) => (
-            <div key={p.id} style={cardStyle}>
+            <div 
+              key={p.id} style={cardStyle}
+              onClick={() => navigate(`/admin/projects/${p.id}`)}
+            >
               <div style={cardTopStyle}>
                 <div>
                   <span style={licensePlateStyle}>{p.car_license_plate}</span>
@@ -115,7 +120,7 @@ const mutedStyle: React.CSSProperties     = { color: 'var(--color-text-muted)', 
 const toolbarStyle: React.CSSProperties   = { display: 'flex', flexDirection: 'column', gap: '0.625rem', marginBottom: '1.25rem' }
 const filterRowStyle: React.CSSProperties = { display: 'flex', flexWrap: 'wrap', gap: '0.375rem' }
 const searchStyle: React.CSSProperties    = { width: '100%', padding: '0.625rem 0.875rem', background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '4px', color: 'var(--color-text)', fontFamily: 'var(--font-body)', fontSize: '0.9rem', outline: 'none' }
-const cardStyle: React.CSSProperties      = { background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '4px', padding: '0.875rem 1rem' }
+const cardStyle: React.CSSProperties      = { background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '4px', padding: '0.875rem 1rem', cursor: 'pointer', transition: 'all 0.1s ease-in-out', userSelect: 'none', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }
 const cardTopStyle: React.CSSProperties   = { display: 'flex', alignItems: 'center', justifyContent: 'space-between' }
 const licensePlateStyle: React.CSSProperties = { fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '1rem', color: 'var(--color-accent)', letterSpacing: '0.05em', marginRight: '0.625rem' }
 const projectNumberStyle: React.CSSProperties = { fontSize: '0.8rem', color: 'var(--color-text-muted)' }

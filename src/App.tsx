@@ -3,6 +3,8 @@ import LoginPage from './pages/LoginPage'
 import ShiftPage from './pages/ShiftPage'
 import AdminDashboard from './pages/admin/AdminDashboard'
 import ProtectedRoute from './components/ProtectedRoute'
+import EmployeeDetailPage from './pages/admin/EmployeeDetailPage'
+import ProjectDetailPage from './pages/admin/ProjectDetailPage'
 
 export default function App() {
   return (
@@ -26,6 +28,24 @@ export default function App() {
               <AdminDashboard />
             </ProtectedRoute>
           }
+        />
+
+        <Route 
+          path="/admin/employees/:id"     
+          element={
+            <ProtectedRoute role="admin">
+              <EmployeeDetailPage />
+            </ProtectedRoute>
+          } 
+        />
+
+        <Route 
+          path="/admin/projects/:id"       
+          element={
+            <ProtectedRoute role="admin">
+              <ProjectDetailPage />
+            </ProtectedRoute>
+          } 
         />
 
         <Route path="*" element={<Navigate to="/login" replace />} />

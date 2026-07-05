@@ -73,3 +73,8 @@ export default defineConfig([
 ])
 
 ```
+
+BACKEND STARTEN:
+in terminal 
+cd to api
+php -S localhost:8000

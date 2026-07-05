@@ -2,10 +2,12 @@ import { useState } from 'react'
 import type { Employee } from '../../../types/database'
 import { useEmployees } from '../../../hooks/useEmployees'
 import { useCreateEmployee } from '../../../hooks/useCreateEmployee'
+import { useNavigate } from 'react-router-dom'
 
 type RoleFilter = 'all' | 'mechanic' | 'admin'
 
 export default function EmployeesTab() {
+  const navigate = useNavigate()
   const { data: employees = [], isLoading, error } = useEmployees()
   const createEmployee = useCreateEmployee()
 
@@ -72,7 +74,10 @@ export default function EmployeesTab() {
                 </thead>
                 <tbody>
                   {filtered.map((e: Employee) => (
-                    <tr key={e.id} style={trStyle}>
+                    <tr 
+                      onClick={() => navigate(`/admin/employees/${e.id}`)}
+                      key={e.id} style={trStyle}
+                    >
                       <td style={tdStyle}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
                           <div style={avatarStyle}>{e.name.charAt(0).toUpperCase()}</div>
@@ -303,7 +308,7 @@ const searchStyle: React.CSSProperties      = { padding: '0.625rem 0.875rem', ba
 const addButtonStyle: React.CSSProperties   = { padding: '0.625rem 1rem', background: 'var(--color-accent)', color: '#fff', border: 'none', borderRadius: '4px', fontFamily: 'var(--font-display)', fontSize: '0.9rem', fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', cursor: 'pointer', whiteSpace: 'nowrap' }
 const tableWrapStyle: React.CSSProperties   = { overflowX: 'auto', border: '1px solid var(--color-border)', borderRadius: '4px' }
 const tableStyle: React.CSSProperties       = { width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }
-const trStyle: React.CSSProperties          = { borderBottom: '1px solid var(--color-border)' }
+const trStyle: React.CSSProperties          = { borderBottom: '1px solid var(--color-border)', cursor: 'pointer', transition: 'background 0.15s', whiteSpace: 'nowrap', userSelect: 'none' }
 const tdStyle: React.CSSProperties          = { padding: '0.75rem 1rem', verticalAlign: 'middle' }
 const avatarStyle: React.CSSProperties      = { width: '28px', height: '28px', borderRadius: '50%', background: 'var(--color-accent)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '0.75rem', flexShrink: 0 }
 const backdropStyle: React.CSSProperties    = { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 40 }
