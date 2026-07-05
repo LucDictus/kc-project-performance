@@ -81,3 +81,4 @@ out/
 .cache/
 .parcel-cache/
 .turbo/
+api/config/db.php
