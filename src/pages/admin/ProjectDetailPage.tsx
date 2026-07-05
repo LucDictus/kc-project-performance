@@ -3,10 +3,12 @@ import PageLayout from '../../components/layout/PageLayout'
 import { useProjectDetail } from '../../hooks/useProjectDetail'
 import type { SessionRow, EmployeeHours } from '../../hooks/useProjectDetail'
 import type { ProjectStatus } from '../../types/database'
+import { useUpdateProjectStatus } from '../../hooks/useUpdateProjectStatus'
 
 export default function ProjectDetailPage() {
   const { id }   = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const updateStatus = useUpdateProjectStatus()
 
   const { data, isLoading, error } = useProjectDetail(id ? Number(id) : null)
 
@@ -39,6 +41,45 @@ export default function ProjectDetailPage() {
               <InfoItem label="Klant"         value={data.project.customer_name} />
               <InfoItem label="Aangemaakt"    value={formatDate(data.project.created_at)} />
               <InfoItem label="Totaal uren"   value={formatMinutes(data.total_minutes)} />
+            </div>
+
+            {/* Status wijzigen */}
+            <div style={{ marginTop: '1.25rem', paddingTop: '1.25rem', borderTop: '1px solid var(--color-border)' }}>
+              <p style={{ fontFamily: 'var(--font-display)', fontSize: '0.7rem', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--color-text-muted)', marginBottom: '0.625rem' }}>
+                Status wijzigen
+              </p>
+              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                {(['open', 'on_hold', 'closed'] as ProjectStatus[]).map(s => (
+                  <button
+                    key={s}
+                    onClick={() => updateStatus.mutate({ id: data.project.id, status: s })}
+                    disabled={data.project.status === s || updateStatus.isPending}
+                    style={{
+                      padding: '0.5rem 1rem',
+                      borderRadius: '2px',
+                      border: '1px solid',
+                      borderColor: data.project.status === s ? 'var(--color-accent)' : 'var(--color-border)',
+                      background: data.project.status === s ? 'rgba(184,39,45,0.1)' : 'transparent',
+                      color: data.project.status === s ? 'var(--color-accent)' : 'var(--color-text-muted)',
+                      fontFamily: 'var(--font-display)',
+                      fontSize: '0.8rem',
+                      fontWeight: 600,
+                      letterSpacing: '0.06em',
+                      textTransform: 'uppercase',
+                      cursor: data.project.status === s ? 'default' : 'pointer',
+                      opacity: updateStatus.isPending && data.project.status !== s ? 0.5 : 1,
+                      transition: 'all 0.15s',
+                    }}
+                  >
+                    {s === 'open' ? 'Open' : s === 'on_hold' ? 'On hold' : 'Gesloten'}
+                  </button>
+                ))}
+              </div>
+              {updateStatus.isSuccess && (
+                <p style={{ color: 'var(--color-success)', fontSize: '0.8rem', marginTop: '0.5rem' }}>
+                  Status bijgewerkt
+                </p>
+              )}
             </div>
           </div>
 
