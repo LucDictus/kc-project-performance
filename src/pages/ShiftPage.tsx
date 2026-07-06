@@ -51,8 +51,8 @@ export default function ShiftPage() {
         <ActiveShift
           shift={shift}
           userId={user.id}
-          onStop={async () => {
-            await stopShift.mutateAsync(shift.shift_id)
+          onStop={async (description) => {
+            await stopShift.mutateAsync({ shift_id: shift.shift_id, description })
           }}
           stopLoading={stopShift.isPending}
         />
@@ -81,12 +81,13 @@ function ActiveShift({
 }: {
   shift: NonNullable<ReturnType<typeof useCurrentShift>['data']>
   userId: number
-  onStop: () => void
+  onStop: (description?: string) => void
   stopLoading: boolean
 }) {
   const qc = useQueryClient()
   const [view, setView] = useState<'home' | 'search' | 'new-project'>('home')
   const [stopConfirm, setStopConfirm] = useState(false)
+  const [description, setDescription] = useState('')
 
   async function handleStopSession(description: string) {
     if (!shift.session_id) return
@@ -141,6 +142,8 @@ function ActiveShift({
       {shift.car_license_plate ? (
         <ActiveSessionCard
           shift={shift}
+          description={description}  
+          onDescriptionChange={setDescription}
           onStop={handleStopSession}
           onSwitch={() => setView('search')}
         />
@@ -164,7 +167,7 @@ function ActiveShift({
           <p style={mutedStyle}>Actieve projectsessie wordt ook gestopt.</p>
           <div style={{ display: 'flex', gap: '0.625rem', marginTop: '1rem' }}>
             <button onClick={() => setStopConfirm(false)} style={cancelButtonStyle}>Annuleren</button>
-            <button onClick={onStop} disabled={stopLoading} style={dangerButtonStyle}>
+            <button onClick={() => onStop(description)} disabled={stopLoading} style={dangerButtonStyle}>
               {stopLoading ? 'Stoppen...' : 'Bevestigen'}
             </button>
           </div>
@@ -175,19 +178,17 @@ function ActiveShift({
 }
 
 /* ─── Actieve sessie kaart ─── */
-function ActiveSessionCard({
-  shift, onStop, onSwitch
-}: {
+function ActiveSessionCard({ shift, description, onDescriptionChange, onStop, onSwitch }: {
   shift: NonNullable<ReturnType<typeof useCurrentShift>['data']>
+  description: string
+  onDescriptionChange: (v: string) => void
   onStop: (description: string) => void
   onSwitch: () => void
 }) {
-  const [description, setDescription] = useState('')
   const [stopConfirm, setStopConfirm] = useState(false)
 
   return (
     <div style={sessionCardStyle}>
-      {/* Project info */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
         <span style={licensePlateStyle}>{shift.car_license_plate}</span>
         <span style={mutedStyle}>{shift.project_number}</span>
@@ -202,40 +203,28 @@ function ActiveSessionCard({
         </p>
       )}
 
-      {/* Beschrijving — altijd zichtbaar */}
       <div style={{ marginTop: '1rem' }}>
         <label style={fieldLabelStyle}>Wat heb je gedaan?</label>
         <textarea
           value={description}
-          onChange={e => setDescription(e.target.value)}
+          onChange={e => onDescriptionChange(e.target.value)}
           placeholder="Beschrijf kort het uitgevoerde werk..."
           rows={3}
           style={textareaStyle}
         />
       </div>
 
-      {/* Knoppen */}
       {!stopConfirm ? (
         <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.875rem' }}>
-          <button onClick={onSwitch} style={cancelButtonStyle}>
-            Wissel project
-          </button>
-          <button onClick={() => setStopConfirm(true)} style={primaryButtonStyle}>
-            Stoppen
-          </button>
+          <button onClick={onSwitch} style={cancelButtonStyle}>Wissel project</button>
+          <button onClick={() => setStopConfirm(true)} style={primaryButtonStyle}>Stoppen</button>
         </div>
       ) : (
         <div style={{ marginTop: '0.875rem' }}>
-          <p style={{ fontWeight: 600, fontSize: '0.875rem', marginBottom: '0.375rem' }}>
-            Sessie stoppen?
-          </p>
+          <p style={{ fontWeight: 600, fontSize: '0.875rem', marginBottom: '0.375rem' }}>Sessie stoppen?</p>
           <div style={{ display: 'flex', gap: '0.5rem' }}>
-            <button onClick={() => setStopConfirm(false)} style={cancelButtonStyle}>
-              Terug
-            </button>
-            <button onClick={() => onStop(description)} style={primaryButtonStyle}>
-              Bevestigen
-            </button>
+            <button onClick={() => setStopConfirm(false)} style={cancelButtonStyle}>Terug</button>
+            <button onClick={() => onStop(description)} style={primaryButtonStyle}>Bevestigen</button>
           </div>
         </div>
       )}

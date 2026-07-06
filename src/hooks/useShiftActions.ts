@@ -13,8 +13,8 @@ export function useStartShift() {
 export function useStopShift() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (shift_id: number) =>
-      api.patch('/shifts/stop.php', { shift_id }),
+    mutationFn: ({ shift_id, description }: { shift_id: number; description?: string }) =>
+      api.patch('/shifts/stop.php', { shift_id, description }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['current-shift'] })
       qc.invalidateQueries({ queryKey: ['overview'] })
