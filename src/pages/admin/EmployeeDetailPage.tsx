@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import PageLayout from '../../components/layout/PageLayout'
 import { useEmployeeDetail } from '../../hooks/useEmployeeDetail'
 import { useUpdateEmployee } from '../../hooks/useUpdateEmployee'
@@ -21,6 +21,7 @@ function getMonthRange(offset: number = 0) {
 export default function EmployeeDetailPage() {
   const { id }   = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const location = useLocation()
   const [offset, setOffset] = useState(0)
   const [editOpen, setEditOpen] = useState(false)
 
@@ -32,9 +33,14 @@ export default function EmployeeDetailPage() {
   )
   const updateEmployee = useUpdateEmployee()
 
+  const returnTab = (location.state as { tab?: string } | null)?.tab ?? 'employees'
+
   return (
     <PageLayout title="Medewerker">
-      <button onClick={() => navigate('/admin', { state: { tab: 'employees' } })} style={backButtonStyle}>
+      <button
+        onClick={() => navigate('/admin', { state: { tab: returnTab } })}
+        style={backButtonStyle}
+      >
         ← Terug naar dashboard
       </button>
 
@@ -173,7 +179,7 @@ export default function EmployeeDetailPage() {
                 {data.projects.map((p: ProjectRow) => (
                   <div
                     key={p.id}
-                    onClick={() => navigate(`/admin/projects/${p.id}`)}
+                    onClick={() => navigate(`/admin/projects/${p.id}`, { state: { tab: 'projects' } })}
                     style={{ ...projectCardStyle, cursor: 'pointer' }}
                   >
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.375rem' }}>
@@ -300,7 +306,7 @@ function EditEmployeeModal({ employee, onClose, onSave, loading, error }: {
   )
 }
 
-/* ─── Kleine helpers ─── */
+/* ─── Helpers ─── */
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>

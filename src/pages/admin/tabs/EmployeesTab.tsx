@@ -75,7 +75,7 @@ export default function EmployeesTab() {
                 <tbody>
                   {filtered.map((e: Employee) => (
                     <tr 
-                      onClick={() => navigate(`/admin/employees/${e.id}`)}
+                      onClick={() => navigate(`/admin/employees/${e.id}`, { state: { tab: 'employees' } })}
                       key={e.id} style={trStyle}
                     >
                       <td style={tdStyle}>

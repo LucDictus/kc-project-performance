@@ -1,4 +1,4 @@
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import PageLayout from '../../components/layout/PageLayout'
 import { useProjectDetail } from '../../hooks/useProjectDetail'
 import type { SessionRow, EmployeeHours } from '../../hooks/useProjectDetail'
@@ -12,9 +12,12 @@ export default function ProjectDetailPage() {
 
   const { data, isLoading, error } = useProjectDetail(id ? Number(id) : null)
 
+  const location = useLocation()
+  const returnTab = (location.state as { tab?: string } | null)?.tab ?? 'overview'
+
   return (
     <PageLayout title="Project">
-      <button onClick={() => navigate('/admin', { state: { tab: 'projects' } })} style={backButtonStyle}>
+      <button onClick={() => navigate('/admin', { state: { tab: returnTab } })} style={backButtonStyle}>
         ← Terug naar dashboard
       </button>
 
