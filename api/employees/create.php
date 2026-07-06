@@ -7,7 +7,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     jsonError('Method not allowed', 405);
 }
 
-$body    = json_decode(file_get_contents('php://input'), true);
+$body     = json_decode(file_get_contents('php://input'), true);
 $name     = trim($body['name']     ?? '');
 $username = trim($body['username'] ?? '');
 $password = trim($body['password'] ?? '');
@@ -23,7 +23,6 @@ if (!in_array($role, ['mechanic', 'admin'])) {
 
 $pdo = getDB();
 
-// Check of username al bestaat
 $check = $pdo->prepare('SELECT id FROM employees WHERE username = ?');
 $check->execute([$username]);
 if ($check->fetch()) {
@@ -34,7 +33,7 @@ $stmt = $pdo->prepare('
     INSERT INTO employees (name, role, username, password_hash, is_active)
     VALUES (?, ?, ?, ?, 1)
 ');
-$stmt->execute([$name, $role, $username, $password]);
+$stmt->execute([$name, $role, $username, password_hash($password, PASSWORD_DEFAULT)]);
 
 $id  = $pdo->lastInsertId();
 $row = $pdo->prepare('SELECT id, name, role, username, is_active, created_at FROM employees WHERE id = ?');
