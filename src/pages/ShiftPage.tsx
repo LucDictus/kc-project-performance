@@ -5,59 +5,204 @@ import { useCurrentShift } from '../hooks/useCurrentShift'
 import { useStartShift, useStopShift } from '../hooks/useShiftActions'
 import { useProjectSearch } from '../hooks/useProjectSearch'
 import { useCreateProject } from '../hooks/useCreateProject'
+import { useMyHours } from '../hooks/useMyHours'
 import { api } from '../lib/api'
 import { useQueryClient } from '@tanstack/react-query'
+import type { DayRow, ProjectRow } from '../hooks/useEmployeeDetail'
+
+type ShiftTab = 'shift' | 'hours'
 
 function getUser() {
   const stored = localStorage.getItem('kc_user')
   return stored ? JSON.parse(stored) as { id: number; name: string; role: string } : null
 }
 
+function getMonthRange(offset: number = 0) {
+  const d     = new Date()
+  const year  = d.getFullYear()
+  const month = d.getMonth() + offset
+  const from  = new Date(year, month, 1)
+  const to    = new Date(year, month + 1, 0)
+  return {
+    from:  from.toISOString().slice(0, 10),
+    to:    to.toISOString().slice(0, 10),
+    label: from.toLocaleDateString('nl-NL', { month: 'long', year: 'numeric' }),
+  }
+}
+
 export default function ShiftPage() {
-  const user      = getUser()
-  const navigate  = useNavigate()
-  const qc        = useQueryClient()
+  const user     = getUser()
+  const navigate = useNavigate()
+  const [tab, setTab] = useState<ShiftTab>('shift')
 
   const { data: shift, isLoading } = useCurrentShift(user?.id ?? null)
-  const startShift  = useStartShift()
-  const stopShift   = useStopShift()
+  const startShift = useStartShift()
+  const stopShift  = useStopShift()
+  const qc         = useQueryClient()
 
   if (!user) {
     navigate('/login', { replace: true })
     return null
   }
 
-  if (isLoading) {
-    return (
-      <PageLayout title="Mijn Dienst">
-        <p style={mutedStyle}>Laden...</p>
-      </PageLayout>
-    )
-  }
+  return (
+    <PageLayout title="Mijn Werkdag">
+      {/* Tab bar */}
+      <div style={tabBarStyle}>
+        <button
+          onClick={() => setTab('shift')}
+          style={{ ...tabButtonStyle, ...(tab === 'shift' ? tabActiveStyle : {}) }}
+        >
+          Mijn Dienst
+        </button>
+        <button
+          onClick={() => setTab('hours')}
+          style={{ ...tabButtonStyle, ...(tab === 'hours' ? tabActiveStyle : {}) }}
+        >
+          Mijn Uren
+        </button>
+      </div>
+
+      <div style={{ marginTop: '1.5rem' }}>
+        {tab === 'shift' && (
+          <>
+            {isLoading ? (
+              <p style={mutedStyle}>Laden...</p>
+            ) : !shift ? (
+              <NoShift
+                onStart={async () => {
+                  await startShift.mutateAsync(user.id)
+                  qc.invalidateQueries({ queryKey: ['current-shift'] })
+                }}
+                loading={startShift.isPending}
+              />
+            ) : (
+              <ActiveShift
+                shift={shift}
+                userId={user.id}
+                onStop={async (description) => {
+                  await stopShift.mutateAsync({ shift_id: shift.shift_id, description })
+                }}
+                stopLoading={stopShift.isPending}
+              />
+            )}
+          </>
+        )}
+
+        {tab === 'hours' && (
+          <MyHoursTab employeeId={user.id} />
+        )}
+      </div>
+    </PageLayout>
+  )
+}
+
+/* ─── Mijn Uren Tab ─── */
+function MyHoursTab({ employeeId }: { employeeId: number }) {
+  const [offset, setOffset] = useState(0)
+  const period = getMonthRange(offset)
+  const { data, isLoading, error } = useMyHours(employeeId, period.from, period.to)
+
+  if (isLoading) return <p style={mutedStyle}>Laden...</p>
+  if (error)     return <p style={{ color: 'var(--color-danger)' }}>Fout bij laden van uren</p>
 
   return (
-    <PageLayout title="Mijn Dienst">
-      {!shift ? (
-        /* Geen actieve dienst */
-        <NoShift
-          onStart={async () => {
-            await startShift.mutateAsync(user.id)
-            qc.invalidateQueries({ queryKey: ['current-shift'] })
-          }}
-          loading={startShift.isPending}
-        />
-      ) : (
-        /* Actieve dienst */
-        <ActiveShift
-          shift={shift}
-          userId={user.id}
-          onStop={async (description) => {
-            await stopShift.mutateAsync({ shift_id: shift.shift_id, description })
-          }}
-          stopLoading={stopShift.isPending}
-        />
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+
+      {/* Periode navigatie */}
+      <div style={periodBarStyle}>
+        <button onClick={() => setOffset(o => o - 1)} style={periodNavStyle}>←</button>
+        <span style={periodLabelStyle}>{period.label}</span>
+        <button
+          onClick={() => setOffset(o => o + 1)}
+          disabled={offset >= 0}
+          style={{ ...periodNavStyle, opacity: offset >= 0 ? 0.3 : 1 }}
+        >
+          →
+        </button>
+      </div>
+
+      {/* Totaal */}
+      {data && (
+        <div style={totalCardStyle}>
+          <p style={totalLabelStyle}>Totaal gewerkt</p>
+          <p style={totalValueStyle}>{formatMinutes(data.total_minutes)}</p>
+        </div>
       )}
-    </PageLayout>
+
+      {/* Uren per dag */}
+      <section>
+        <h3 style={sectionTitleStyle}>Uren per dag</h3>
+        {!data || data.days.length === 0 ? (
+          <p style={mutedStyle}>Geen geregistreerde uren in deze periode.</p>
+        ) : (
+          <div style={tableWrapStyle}>
+            <table style={tableStyle}>
+              <thead>
+                <tr>
+                  <Th>Datum</Th>
+                  <Th>Ingeklokt</Th>
+                  <Th>Uitgeklokt</Th>
+                  <Th>Totaal</Th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.days.map((day: DayRow) => (
+                  <tr key={day.date} style={trStyle}>
+                    <td style={tdStyle}>{formatDate(day.date)}</td>
+                    <td style={tdStyle}>{formatTime(day.first_clock_in)}</td>
+                    <td style={tdStyle}>{formatTime(day.last_clock_out)}</td>
+                    <td style={{ ...tdStyle, fontFamily: 'var(--font-display)', fontWeight: 600 }}>
+                      {formatMinutes(day.total_minutes)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr style={{ borderTop: '2px solid var(--color-border)' }}>
+                  <td colSpan={3} style={{ ...tdStyle, fontFamily: 'var(--font-display)', fontWeight: 700, textTransform: 'uppercase', fontSize: '0.8rem', letterSpacing: '0.06em' }}>
+                    Totaal
+                  </td>
+                  <td style={{ ...tdStyle, fontFamily: 'var(--font-display)', fontWeight: 700, color: 'var(--color-accent)' }}>
+                    {formatMinutes(data.total_minutes)}
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        )}
+      </section>
+
+      {/* Projecten */}
+      <section>
+        <h3 style={sectionTitleStyle}>Projecten</h3>
+        {!data || data.projects.length === 0 ? (
+          <p style={mutedStyle}>Geen projecten in deze periode.</p>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.625rem' }}>
+            {data.projects.map((p: ProjectRow) => (
+              <div key={p.id} style={projectCardStyle}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.375rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
+                    <span style={licensePlateStyle}>{p.car_license_plate}</span>
+                    <span style={mutedStyle}>{p.project_number}</span>
+                  </div>
+                  <StatusBadge status={p.status} />
+                </div>
+                <p style={{ fontWeight: 500, fontSize: '0.875rem' }}>{p.car_make_model}</p>
+                <p style={mutedStyle}>{p.customer_name}</p>
+                <div style={{ display: 'flex', gap: '1rem', marginTop: '0.5rem' }}>
+                  <span style={mutedStyle}>{p.session_count} {p.session_count === 1 ? 'sessie' : 'sessies'}</span>
+                  <span style={{ ...mutedStyle, fontFamily: 'var(--font-display)', fontWeight: 600, color: 'var(--color-text)' }}>
+                    {formatMinutes(p.total_minutes)}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+    </div>
   )
 }
 
@@ -85,26 +230,28 @@ function ActiveShift({
   stopLoading: boolean
 }) {
   const qc = useQueryClient()
-  const [view, setView] = useState<'home' | 'search' | 'new-project'>('home')
+  const [view, setView]           = useState<'home' | 'search' | 'new-project'>('home')
   const [stopConfirm, setStopConfirm] = useState(false)
   const [description, setDescription] = useState('')
 
-  async function handleStopSession(description: string) {
+  async function handleStopSession(desc: string) {
     if (!shift.session_id) return
-    await api.patch('/sessions/stop.php', {   // ← was /sessions/index.php
+    await api.patch('/sessions/stop.php', {
       session_id: shift.session_id,
-      description,
+      description: desc,
     })
     qc.invalidateQueries({ queryKey: ['current-shift'] })
+    setDescription('')
     setView('home')
   }
 
   async function handleStartSession(projectId: number) {
     await api.post('/sessions/index.php', {
-      shift_id: shift.shift_id,
+      shift_id:   shift.shift_id,
       project_id: projectId,
     })
     qc.invalidateQueries({ queryKey: ['current-shift'] })
+    setDescription('')
     setView('home')
   }
 
@@ -131,18 +278,15 @@ function ActiveShift({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-
-      {/* Dienst info */}
       <div style={cardStyle}>
         <p style={cardLabelStyle}>Dienst gestart om</p>
         <p style={cardValueStyle}>{formatTime(shift.shift_started_at)}</p>
       </div>
 
-      {/* Actief project */}
       {shift.car_license_plate ? (
         <ActiveSessionCard
           shift={shift}
-          description={description}  
+          description={description}
           onDescriptionChange={setDescription}
           onStop={handleStopSession}
           onSwitch={() => setView('search')}
@@ -156,7 +300,6 @@ function ActiveShift({
         </div>
       )}
 
-      {/* Dienst stoppen */}
       {!stopConfirm ? (
         <button onClick={() => setStopConfirm(true)} style={dangerButtonStyle}>
           Dienst stoppen
@@ -178,7 +321,9 @@ function ActiveShift({
 }
 
 /* ─── Actieve sessie kaart ─── */
-function ActiveSessionCard({ shift, description, onDescriptionChange, onStop, onSwitch }: {
+function ActiveSessionCard({
+  shift, description, onDescriptionChange, onStop, onSwitch
+}: {
   shift: NonNullable<ReturnType<typeof useCurrentShift>['data']>
   description: string
   onDescriptionChange: (v: string) => void
@@ -366,25 +511,96 @@ function NewProjectForm({
   )
 }
 
+/* ─── Status badge ─── */
+function StatusBadge({ status }: { status: string }) {
+  const map: Record<string, { label: string; color: string; bg: string }> = {
+    open:    { label: 'Open',     color: 'var(--color-success)',    bg: 'rgba(22,163,74,0.1)' },
+    on_hold: { label: 'On hold',  color: 'var(--color-text-muted)', bg: 'rgba(255,255,255,0.06)' },
+    closed:  { label: 'Gesloten', color: 'var(--color-accent)',     bg: 'rgba(184,39,45,0.1)' },
+  }
+  const s = map[status] ?? map.open
+  return (
+    <span style={{
+      padding: '0.2rem 0.6rem',
+      borderRadius: '2px',
+      fontSize: '0.75rem',
+      fontWeight: 600,
+      fontFamily: 'var(--font-display)',
+      letterSpacing: '0.04em',
+      textTransform: 'uppercase',
+      background: s.bg,
+      color: s.color,
+    }}>
+      {s.label}
+    </span>
+  )
+}
+
+/* ─── Helpers ─── */
+function Th({ children }: { children: React.ReactNode }) {
+  return (
+    <th style={{
+      padding: '0.625rem 1rem',
+      textAlign: 'left',
+      fontFamily: 'var(--font-display)',
+      fontSize: '0.75rem',
+      fontWeight: 600,
+      letterSpacing: '0.08em',
+      textTransform: 'uppercase',
+      color: 'var(--color-text-muted)',
+      borderBottom: '1px solid var(--color-border)',
+      whiteSpace: 'nowrap',
+    }}>
+      {children}
+    </th>
+  )
+}
+
+function formatDate(iso: string) {
+  return new Date(iso).toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' })
+}
 function formatTime(iso: string) {
   return new Date(iso).toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' })
 }
+function formatMinutes(total: number) {
+  const h = Math.floor(total / 60)
+  const m = total % 60
+  if (h === 0) return `${m}m`
+  if (m === 0) return `${h}u`
+  return `${h}u ${m}m`
+}
 
-const mutedStyle: React.CSSProperties        = { color: 'var(--color-text-muted)', fontSize: '0.85rem' }
-const centeredStyle: React.CSSProperties     = { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '1rem', minHeight: '60dvh', textAlign: 'center' }
-const bigIconStyle: React.CSSProperties      = { fontSize: '3rem' }
-const headingStyle: React.CSSProperties      = { fontFamily: 'var(--font-display)', fontSize: '1.5rem', fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase' }
-const cardStyle: React.CSSProperties         = { background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '4px', padding: '1rem 1.25rem' }
-const cardLabelStyle: React.CSSProperties    = { fontFamily: 'var(--font-display)', fontSize: '0.7rem', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--color-text-muted)', marginBottom: '0.25rem' }
-const cardValueStyle: React.CSSProperties    = { fontFamily: 'var(--font-display)', fontSize: '1.75rem', fontWeight: 700 }
-const sessionCardStyle: React.CSSProperties  = { background: 'var(--color-surface)', border: '1px solid var(--color-accent)', borderRadius: '4px', padding: '1rem 1.25rem' }
-const confirmCardStyle: React.CSSProperties  = { background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '4px', padding: '1rem 1.25rem' }
-const projectResultStyle: React.CSSProperties = { width: '100%', background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '4px', padding: '0.875rem 1rem', cursor: 'pointer', transition: 'border-color 0.15s' }
-const licensePlateStyle: React.CSSProperties = { fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '1rem', color: 'var(--color-accent)', letterSpacing: '0.05em' }
-const fieldLabelStyle: React.CSSProperties   = { display: 'block', fontFamily: 'var(--font-display)', fontSize: '0.75rem', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--color-text-muted)', marginBottom: '0.4rem' }
-const inputStyle: React.CSSProperties        = { display: 'block', width: '100%', padding: '0.75rem 1rem', background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '2px', color: 'var(--color-text)', fontFamily: 'var(--font-body)', fontSize: '1rem', outline: 'none' }
-const textareaStyle: React.CSSProperties     = { display: 'block', width: '100%', padding: '0.75rem 1rem', background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '2px', color: 'var(--color-text)', fontFamily: 'var(--font-body)', fontSize: '1rem', outline: 'none', resize: 'vertical' }
+/* ─── Styles ─── */
+const mutedStyle: React.CSSProperties         = { color: 'var(--color-text-muted)', fontSize: '0.85rem' }
+const tabBarStyle: React.CSSProperties        = { display: 'flex', borderBottom: '1px solid var(--color-border)' }
+const tabButtonStyle: React.CSSProperties     = { padding: '0.75rem 1.25rem', background: 'none', border: 'none', borderBottom: '2px solid transparent', cursor: 'pointer', fontFamily: 'var(--font-display)', fontSize: '0.95rem', fontWeight: 600, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'var(--color-text-muted)', whiteSpace: 'nowrap', transition: 'color 0.15s' }
+const tabActiveStyle: React.CSSProperties     = { color: 'var(--color-accent)', borderBottom: '2px solid var(--color-accent)' }
+const centeredStyle: React.CSSProperties      = { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '1rem', minHeight: '60dvh', textAlign: 'center' }
+const bigIconStyle: React.CSSProperties       = { fontSize: '3rem' }
+const headingStyle: React.CSSProperties       = { fontFamily: 'var(--font-display)', fontSize: '1.5rem', fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase' }
+const cardStyle: React.CSSProperties          = { background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '4px', padding: '1rem 1.25rem' }
+const cardLabelStyle: React.CSSProperties     = { fontFamily: 'var(--font-display)', fontSize: '0.7rem', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--color-text-muted)', marginBottom: '0.25rem' }
+const cardValueStyle: React.CSSProperties     = { fontFamily: 'var(--font-display)', fontSize: '1.75rem', fontWeight: 700 }
+const sessionCardStyle: React.CSSProperties   = { background: 'var(--color-surface)', border: '1px solid var(--color-accent)', borderRadius: '4px', padding: '1rem 1.25rem' }
+const confirmCardStyle: React.CSSProperties   = { background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '4px', padding: '1rem 1.25rem' }
+const projectResultStyle: React.CSSProperties = { width: '100%', background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '4px', padding: '0.875rem 1rem', cursor: 'pointer' }
+const projectCardStyle: React.CSSProperties   = { background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '4px', padding: '0.875rem 1rem' }
+const licensePlateStyle: React.CSSProperties  = { fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '1rem', color: 'var(--color-accent)', letterSpacing: '0.05em' }
+const fieldLabelStyle: React.CSSProperties    = { display: 'block', fontFamily: 'var(--font-display)', fontSize: '0.75rem', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--color-text-muted)', marginBottom: '0.4rem' }
+const inputStyle: React.CSSProperties         = { display: 'block', width: '100%', padding: '0.75rem 1rem', background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '2px', color: 'var(--color-text)', fontFamily: 'var(--font-body)', fontSize: '1rem', outline: 'none' }
+const textareaStyle: React.CSSProperties      = { display: 'block', width: '100%', padding: '0.75rem 1rem', background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '2px', color: 'var(--color-text)', fontFamily: 'var(--font-body)', fontSize: '1rem', outline: 'none', resize: 'vertical' }
 const primaryButtonStyle: React.CSSProperties = { width: '100%', padding: '0.875rem', background: 'var(--color-accent)', color: '#fff', border: 'none', borderRadius: '2px', fontFamily: 'var(--font-display)', fontSize: '1rem', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', cursor: 'pointer' }
 const dangerButtonStyle: React.CSSProperties  = { width: '100%', padding: '0.875rem', background: 'transparent', color: 'var(--color-danger)', border: '1px solid var(--color-danger)', borderRadius: '2px', fontFamily: 'var(--font-display)', fontSize: '1rem', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', cursor: 'pointer' }
 const cancelButtonStyle: React.CSSProperties  = { flex: 1, padding: '0.75rem', background: 'transparent', border: '1px solid var(--color-border)', borderRadius: '2px', color: 'var(--color-text-muted)', fontFamily: 'var(--font-display)', fontSize: '0.9rem', fontWeight: 600, letterSpacing: '0.04em', textTransform: 'uppercase', cursor: 'pointer' }
 const backButtonStyle: React.CSSProperties    = { background: 'none', border: 'none', color: 'var(--color-text-muted)', fontFamily: 'var(--font-body)', fontSize: '0.875rem', cursor: 'pointer', padding: 0, textAlign: 'left' }
+const periodBarStyle: React.CSSProperties     = { display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '4px', padding: '0.625rem 1rem' }
+const periodNavStyle: React.CSSProperties     = { background: 'none', border: 'none', color: 'var(--color-text)', fontSize: '1rem', cursor: 'pointer', padding: '0.25rem 0.5rem' }
+const periodLabelStyle: React.CSSProperties   = { fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: '1rem', letterSpacing: '0.04em', textTransform: 'capitalize' }
+const sectionTitleStyle: React.CSSProperties  = { fontFamily: 'var(--font-display)', fontSize: '0.85rem', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--color-text-muted)', marginBottom: '0.75rem' }
+const tableWrapStyle: React.CSSProperties     = { overflowX: 'auto', border: '1px solid var(--color-border)', borderRadius: '4px' }
+const tableStyle: React.CSSProperties         = { width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }
+const trStyle: React.CSSProperties            = { borderBottom: '1px solid var(--color-border)' }
+const tdStyle: React.CSSProperties            = { padding: '0.75rem 1rem', verticalAlign: 'middle' }
+const totalCardStyle: React.CSSProperties     = { background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '4px', padding: '1rem 1.25rem' }
+const totalLabelStyle: React.CSSProperties    = { fontFamily: 'var(--font-display)', fontSize: '0.7rem', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--color-text-muted)', marginBottom: '0.25rem' }
+const totalValueStyle: React.CSSProperties    = { fontFamily: 'var(--font-display)', fontSize: '2rem', fontWeight: 700, color: 'var(--color-accent)' }
