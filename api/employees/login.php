@@ -7,7 +7,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     jsonError('Method not allowed', 405);
 }
 
-$body = json_decode(file_get_contents('php://input'), true);
+$body     = json_decode(file_get_contents('php://input'), true);
 $username = trim($body['username'] ?? '');
 $password = trim($body['password'] ?? '');
 
@@ -25,12 +25,7 @@ $stmt = $pdo->prepare('
 $stmt->execute([$username]);
 $employee = $stmt->fetch();
 
-if (!$employee) {
-    jsonError('Gebruikersnaam of wachtwoord onjuist', 401);
-}
-
-// TODO: vervang door password_verify() zodra wachtwoorden gehasht zijn
-if ($employee['password_hash'] !== $password) {
+if (!$employee || !password_verify($password, $employee['password_hash'])) {
     jsonError('Gebruikersnaam of wachtwoord onjuist', 401);
 }
 

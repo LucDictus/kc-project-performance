@@ -35,7 +35,7 @@ if (isset($body['role'])) {
 }
 if (isset($body['password']) && trim($body['password']) !== '') {
     $fields[] = 'password_hash = ?';
-    $params[] = trim($body['password']);
+    $params[] = password_hash(trim($body['password']), PASSWORD_DEFAULT);
 }
 if (isset($body['is_active'])) {
     $fields[] = 'is_active = ?';
